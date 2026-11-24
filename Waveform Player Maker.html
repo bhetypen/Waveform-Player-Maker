@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Waveform Player Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: practical studio tool, calm and precise
+   IDEA: a channel strip beside a monitor speaker
+   PICTURE: the live player preview, large at the top
+   COLOUR and TYPE: warm white and graphite, one record-red accent; Archivo
+   LAYOUT: controls strip left, preview + code right; stacks under 900px */
+:root{color-scheme:light dark;--bg:light-dark(#f7f6f3,#121316);--panel:light-dark(#ffffff,#1b1c20);--ink:light-dark(#17181b,#ecebe7);--mute:light-dark(#5e6067,#a2a4ab);--line:light-dark(#e2e0da,#2e3036);--acc:light-dark(#c23b22,#ff6a4d);--accInk:light-dark(#ffffff,#1a0d09);--code:light-dark(#f2f1ed,#0d0e10)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Archivo,system-ui,sans-serif;overflow-x:clip}
+.top{padding:28px max(5vw,16px) 4px;max-width:1320px;margin:0 auto}
+.top h1{font-size:clamp(30px,4vw,44px);line-height:1.05;margin:0 0 8px;text-wrap:balance}
+.top p{margin:0;color:var(--mute);max-width:64ch}
+.wrap{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);grid-template-areas:"ctl prev" "ctl out";grid-template-rows:auto 1fr;gap:20px 24px;padding:20px max(5vw,16px) 56px;max-width:1320px;margin:0 auto;align-items:start}
+@media(max-width:900px){.wrap{grid-template-columns:minmax(0,1fr);grid-template-areas:"prev" "ctl" "out";grid-template-rows:auto}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.ctl{grid-area:ctl;display:grid;gap:14px}
+.prev{grid-area:prev}.out{grid-area:out}
+h2{font-size:16px;margin:0 0 12px;font-weight:700;display:flex;gap:8px;align-items:baseline}
+h2 span{font-weight:500;color:var(--mute);font-size:13px}
+.f{display:block;font-size:13px;color:var(--mute);margin:14px 0 5px}
+input[type=text],input[type=url]{width:100%;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+input:focus-visible,button:focus-visible,pre:focus-visible,.drop:focus-within{outline:2px solid var(--acc);outline-offset:2px}
+.drop{position:relative;display:grid;place-items:center;text-align:center;gap:2px;padding:22px 14px;border:1.5px dashed color-mix(in srgb,var(--ink) 30%,transparent);border-radius:10px;cursor:pointer;background:var(--bg)}
+.drop.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 8%,var(--bg))}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+.drop b{font-size:15px}.drop small{color:var(--mute);font-size:13px;overflow-wrap:anywhere}
+.meta{font-size:13px;color:var(--mute);margin:8px 0 0}
+.err{color:var(--acc);font-size:14px;margin-top:8px;font-weight:600}
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px;background:var(--bg)}
+.seg button{flex:1;min-height:38px;border:0;border-radius:6px;background:transparent;color:var(--ink);font:inherit;font-size:14px;cursor:pointer;padding:0 8px}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.colors{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cf{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--bg)}
+.cf input[type=color]{width:34px;height:34px;border:0;padding:0;background:none;cursor:pointer;flex:none}
+.cf div{display:grid;line-height:1.2;flex:1}.cf small{font-size:12px;color:var(--mute)}
+.cf input[type=text]{border:0;padding:0;background:none;font:15px ui-monospace,Menlo,monospace;border-radius:0}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.chip{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:4px 11px;border:1px solid var(--line);border-radius:99px;background:var(--bg);color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
+.chip span{display:inline-flex}.chip i{width:12px;height:12px;border-radius:50%;margin-right:-3px;border:1px solid rgba(127,127,127,.4)}
+.check{display:flex;align-items:center;gap:9px;font-size:14px;margin-top:10px;cursor:pointer;min-height:32px}
+.check input{width:18px;height:18px;accent-color:var(--acc);margin:0}
+.warn{margin-top:10px;font-size:13px;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,#e6a700 20%,transparent)}
+.range{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;margin-top:10px;font-size:14px}
+.range input{grid-column:1/-1;width:100%;accent-color:var(--acc);min-height:28px}
+.range output{color:var(--mute);font-variant-numeric:tabular-nums}
+.stagebar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.stagebar h2{margin:0}.stagebar .seg{width:220px}
+.stage{padding:clamp(14px,4vw,40px);border-radius:12px;transition:background .2s}
+.stage.light{background:#fff;box-shadow:inset 0 0 0 1px #e5e3de}.stage.dark{background:#202125}
+.stage .wfp-player{margin:0}
+.note{font-size:13px;color:var(--mute);margin:10px 0 0;overflow-wrap:anywhere}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{min-height:44px;padding:0 16px;border:0;background:none;color:var(--mute);font:inherit;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected=true]{color:var(--ink);border-color:var(--acc)}
+.codebar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;flex-wrap:wrap;font-size:13px;color:var(--mute)}
+pre{margin:0;max-height:380px;overflow:auto;background:var(--code);border-radius:10px;padding:14px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}
+.btn{min-height:44px;padding:0 16px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:var(--accInk)}
+.actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.actions .meta{margin:0}
+.locked{margin-top:14px;padding:28px;text-align:center;color:var(--mute);border:1.5px dashed var(--line);border-radius:10px}
+.how{margin-top:20px;border-top:1px solid var(--line);padding-top:12px}
+.how summary{cursor:pointer;font-weight:700;min-height:32px}
+.how ol{padding-left:20px;margin:8px 0 0;max-width:72ch}.how li{margin-bottom:8px}
+.how code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:.88em}
+@media(prefers-reduced-motion:reduce){.stage{transition:none}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+{
+/* ---------- The player script that gets exported (plain JS, no libraries) ---------- */
+function wfpRuntime() {
+  /* Written without ampersands or angle brackets, so WordPress cannot break it */
+  var players = [];
+  var NS = 'http://www.w3.org/2000/svg';
+  function fmt(s) {
+    if (!isFinite(s)) s = 0;
+    s = Math.floor(Math.max(0, s));
+    return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+  }
+  function svgEl(name, attrs) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function setup(el) {
+    if (el.getAttribute('data-wfp-ready')) return;
+    var audio = el.querySelector('audio'), btn = el.querySelector('.wfp-btn'), wave = el.querySelector('.wfp-wave');
+    if (!audio || !btn || !wave) return;
+    el.setAttribute('data-wfp-ready', '1');
+    var base = wave.querySelector('.wfp-base'), hover = wave.querySelector('.wfp-hover'), played = wave.querySelector('.wfp-played');
+    var cur = el.querySelector('.wfp-cur'), tot = el.querySelector('.wfp-tot'), share = el.querySelector('.wfp-share');
+    var peaks = (wave.getAttribute('data-peaks') || '').split(',').map(Number).filter(function (v) { return !isNaN(v); });
+    var dur = parseFloat(wave.getAttribute('data-duration')) || 0, pending = null, dragging = false;
+    function D() { return (isFinite(audio.duration) ? audio.duration : 0) || dur; }
+    function now() { return pending === null ? audio.currentTime : pending; }
+    function draw() {
+      var cs = getComputedStyle(el);
+      var bw = parseFloat(cs.getPropertyValue('--wfp-bar-w')) || 3;
+      var gp = parseFloat(cs.getPropertyValue('--wfp-gap')); if (isNaN(gp)) gp = 1;
+      var mr = parseFloat(cs.getPropertyValue('--wfp-mirror')) || 0;
+      var W = wave.clientWidth, H = wave.clientHeight;
+      if (!W || !H || !peaks.length) return;
+      var n = Math.max(1, Math.floor((W + gp) / (bw + gp)));
+      var top = mr ? H * (1 - mr) - 1 : H, bot = mr ? H * mr : 0;
+      var layers = [base, hover, played];
+      var svgs = layers.map(function () {
+        return svgEl('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, 'aria-hidden': 'true', focusable: 'false' });
+      });
+      for (var i = 0; i !== n; i++) {
+        var a = Math.floor(i * peaks.length / n), b = Math.max(a + 1, Math.floor((i + 1) * peaks.length / n));
+        var p = Math.max.apply(null, peaks.slice(a, b).concat([0])) / 100;
+        var x = (i * (bw + gp)).toFixed(1), h = Math.max(1, p * top), hb = Math.max(1, p * bot);
+        svgs.forEach(function (s) {
+          s.appendChild(svgEl('rect', { 'class': 'wfp-t', x: x, y: (top - h).toFixed(1), width: bw, height: h.toFixed(1) }));
+          if (bot) s.appendChild(svgEl('rect', { 'class': 'wfp-r', x: x, y: (top + 1).toFixed(1), width: bw, height: hb.toFixed(1) }));
+        });
+      }
+      layers.forEach(function (l, k) { l.textContent = ''; l.appendChild(svgs[k]); });
+    }
+    function prog() {
+      var d = D(), t = now(), r = d ? Math.min(1, t / d) : 0;
+      played.style.width = (r * 100) + '%';
+      if (cur) cur.textContent = fmt(t);
+      if (t || !audio.paused) el.classList.add('wfp-started');
+      wave.setAttribute('aria-valuenow', Math.round(t));
+      wave.setAttribute('aria-valuetext', fmt(t) + ' of ' + fmt(d));
+    }
+    function seek(t) {
+      t = Math.max(0, Math.min(D() || 0, t));
+      if (audio.readyState) audio.currentTime = t;
+      else { pending = t; audio.load(); }
+      prog();
+    }
+    function pos(e) {
+      var r = wave.getBoundingClientRect();
+      return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    }
+    if (tot) tot.textContent = fmt(D());
+    audio.addEventListener('loadedmetadata', function () {
+      if (tot) tot.textContent = fmt(D());
+      wave.setAttribute('aria-valuemax', Math.round(D()));
+      if (pending !== null) { audio.currentTime = pending; pending = null; }
+    });
+    audio.addEventListener('timeupdate', prog);
+    audio.addEventListener('play', function () {
+      el.classList.add('wfp-playing');
+      btn.setAttribute('aria-label', 'Pause');
+      players.forEach(function (o) { if (o !== audio) o.pause(); });
+      prog();
+    });
+    function stopped() { el.classList.remove('wfp-playing'); btn.setAttribute('aria-label', 'Play'); }
+    audio.addEventListener('pause', stopped);
+    audio.addEventListener('ended', stopped);
+    players.push(audio);
+    btn.addEventListener('click', function () {
+      if (audio.paused) {
+        var pr = audio.play();
+        if (pr) pr['catch'](function () {});
+      } else audio.pause();
+    });
+    wave.addEventListener('pointerdown', function (e) {
+      dragging = true;
+      try { wave.setPointerCapture(e.pointerId); } catch (x) {}
+      seek(pos(e) * D());
+    });
+    wave.addEventListener('pointermove', function (e) {
+      hover.style.width = (pos(e) * 100) + '%';
+      if (dragging) seek(pos(e) * D());
+    });
+    wave.addEventListener('pointerup', function () { dragging = false; });
+    wave.addEventListener('pointercancel', function () { dragging = false; });
+    wave.addEventListener('pointerleave', function () { hover.style.width = '0'; });
+    wave.addEventListener('keydown', function (e) {
+      var k = e.key;
+      if (k === 'ArrowRight' || k === 'ArrowUp') seek(now() + 5);
+      else if (k === 'ArrowLeft' || k === 'ArrowDown') seek(now() - 5);
+      else if (k === 'Home') seek(0);
+      else if (k === 'End') seek(D());
+      else if (k === ' ' || k === 'Enter') btn.click();
+      else return;
+      e.preventDefault();
+    });
+    if (share) share.addEventListener('click', function () {
+      var url = location.href, title = el.getAttribute('data-title') || document.title;
+      var label = share.querySelector('.wfp-share-label');
+      if (navigator.share) navigator.share({ title: title, url: url })['catch'](function () {});
+      else if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(function () {
+          if (!label) return;
+          var old = label.textContent;
+          label.textContent = 'Link copied';
+          setTimeout(function () { label.textContent = old; }, 1600);
+        })['catch'](function () {});
+      }
+    });
+    if (window.ResizeObserver) { var ro = new ResizeObserver(draw); ro.observe(wave); }
+    else window.addEventListener('resize', draw);
+    el._wfpDraw = draw;
+    draw();
+    prog();
+  }
+  function init() {
+    Array.prototype.forEach.call(document.querySelectorAll('.wfp-player'), setup);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+}
+
+/* ---------- Helpers ---------- */
+const {useState,useEffect,useMemo,useRef}=React;
+const h=htm.bind(React.createElement);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=s=>{s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const isHex=v=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v);
+const normHex=v=>{v=v.toLowerCase();return v.length===4?'#'+v.slice(1).split('').map(c=>c+c).join(''):v};
+const rgb=x=>{const n=parseInt(normHex(x).slice(1),16);return [n>>16&255,n>>8&255,n&255]};
+const lum=x=>rgb(x).map(v=>{v/=255;return v<=.03928?v/12.92:((v+.055)/1.055)**2.4}).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0);
+const contrast=(a,b)=>{const A=lum(a),B=lum(b);return (Math.max(A,B)+.05)/(Math.min(A,B)+.05)};
+const onColor=c=>lum(c)>.4?'#111111':'#ffffff';
+const niceName=n=>n.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').replace(/\s+/g,' ').trim()||'Untitled';
+const slug=s=>(s||'song').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'song';
+
+const SAMPLE=Array.from({length:300},(_,i)=>{const v=.58+.22*Math.sin(i/9)+.14*Math.sin(i/2.3)+.08*Math.sin(i*1.7);return Math.round(Math.max(.06,Math.min(1,v))*Math.min(1,(i+2)/14)*100)});
+
+const PRESETS=[
+  {name:'Studio',bg:'#f2f2f2',text:'#333333',wave:'#8a8a8a',accent:'#b03a2e'},
+  {name:'Ember',bg:'#ffffff',text:'#222222',wave:'#a3a3a3',accent:'#ff5500'},
+  {name:'Night',bg:'#1b1d22',text:'#eceff4',wave:'#5d6371',accent:'#4fd1c5'},
+  {name:'Paper',bg:'#f6efe3',text:'#3b2f25',wave:'#bca88f',accent:'#7a4b2a'}
+];
+
+function decode(buf){
+  const tryCtx=(ctx)=>new Promise((res,rej)=>{let done=false;const ok=v=>{if(!done){done=true;res(v)}},no=e=>{if(!done){done=true;rej(e)}};try{const p=ctx.decodeAudioData(buf.slice(0),ok,no);if(p&&p.then)p.then(ok,no)}catch(e){no(e)}});
+  const AC=window.AudioContext||window.webkitAudioContext,OC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  return (async()=>{
+    let last;
+    if(AC){let ctx;try{ctx=new AC();return await tryCtx(ctx)}catch(e){last=e}finally{try{ctx&&ctx.close()}catch(x){}}}
+    if(OC){try{return await tryCtx(new OC(1,44100,44100))}catch(e){last=e}}
+    throw last||new Error('This browser cannot decode audio');
+  })();
+}
+async function analyze(file,N=300){
+  const buf=await file.arrayBuffer();
+  const ab=await decode(buf);
+  const chs=[];for(let c=0;c<ab.numberOfChannels;c++)chs.push(ab.getChannelData(c));
+  const len=ab.length,step=len/N,out=[];
+  for(let i=0;i<N;i++){
+    const a=Math.floor(i*step),b=Math.floor((i+1)*step),stride=Math.max(1,Math.floor((b-a)/3000));
+    let sum=0,cnt=0;
+    for(let j=a;j<b;j+=stride){let v=0;for(const ch of chs)v+=ch[j];v/=chs.length;sum+=v*v;cnt++}
+    out.push(cnt?Math.sqrt(sum/cnt):0);
+  }
+  const max=Math.max(...out)||1;
+  return {peaks:out.map(v=>Math.max(2,Math.round(Math.pow(v/max,.8)*100))),duration:ab.duration};
+}
+/* Duration from a media element, used when decoding fails */
+function mediaDuration(url){return new Promise(res=>{const a=document.createElement('audio');a.preload='metadata';a.onloadedmetadata=()=>res(isFinite(a.duration)?a.duration:0);a.onerror=()=>res(0);a.src=url;setTimeout(()=>res(0),8000)})}
+
+/* ---------- Code builders ---------- */
+const ICON_PLAY='<svg class="wfp-i-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg>';
+const ICON_PAUSE='<svg class="wfp-i-pause" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+const ICON_SHARE='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg>';
+const ICON_NOTE='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>';
+
+function buildHTML(o){
+  const t=esc(o.title||'Untitled'),L=[];
+  L.push('<!-- Waveform Player: paste into a Custom HTML block (one per song) -->');
+  L.push(`<div class="wfp-player" data-title="${t}">`);
+  L.push(`  <div class="wfp-card${o.coverMode==='none'?' wfp-nocover':''}">`);
+  if(o.coverMode==='image'){
+    if(o.coverNote)L.push(`    <!-- Replace "${esc(o.coverSrc)}" with the full URL of your cover image -->`);
+    L.push(`    <img class="wfp-cover" src="${esc(o.coverSrc)}" alt="Cover art: ${t}" loading="lazy">`);
+  }else if(o.coverMode==='placeholder'){
+    if(!o.preview)L.push('    <!-- Placeholder: replace this div with <img class="wfp-cover" src="YOUR-IMAGE-URL" alt="Cover art"> -->');
+    L.push(`    <div class="wfp-cover wfp-cover-ph" aria-hidden="true">${ICON_NOTE}</div>`);
+  }
+  L.push('    <div class="wfp-head">');
+  L.push(`      <button class="wfp-btn" type="button" aria-label="Play">${ICON_PLAY}${ICON_PAUSE}</button>`);
+  L.push(`      <span class="wfp-title">${t}</span>`);
+  if(o.share)L.push(`      <button class="wfp-share" type="button">${ICON_SHARE}<span class="wfp-share-label">Share</span></button>`);
+  L.push('    </div>');
+  L.push(`    <div class="wfp-wave" role="slider" tabindex="0" aria-label="Seek: ${t}" aria-valuemin="0" aria-valuemax="${Math.round(o.duration)}" aria-valuenow="0"`);
+  L.push(`         data-duration="${o.duration.toFixed(2)}" data-peaks="${o.peaks.join(',')}">`);
+  L.push('      <div class="wfp-base"></div><div class="wfp-layer wfp-hover"></div><div class="wfp-layer wfp-played"></div>');
+  L.push(`      <span class="wfp-time wfp-cur">0:00</span><span class="wfp-time wfp-tot">${fmt(o.duration)}</span>`);
+  L.push('    </div>');
+  L.push('  </div>');
+  if(o.audioNote)L.push(`  <!-- Replace "${esc(o.audioSrc)}" with the full URL of your audio file -->`);
+  L.push(o.audioSrc?`  <audio preload="metadata" src="${esc(o.audioSrc)}"></audio>`:'  <audio preload="metadata"></audio>');
+  L.push('</div>');
+  return L.join('\n');
+}
+
+function buildCSS(v){return `/* Waveform Player styles: paste once per site.
+   To change the look later, edit the variables in this first block. */
+.wfp-player{
+  --wfp-bg: ${v.bg};
+  --wfp-text: ${v.text};
+  --wfp-wave: ${v.wave};
+  --wfp-accent: ${v.accent};          /* play button + played part */
+  --wfp-btn-icon: ${v.icon};          /* icon on the play button */
+  --wfp-badge-ink: ${v.badgeInk};       /* text on the time badge */
+  --wfp-radius: ${v.radius}px;           /* card corners */
+  --wfp-cover-size: 150px;
+  --wfp-cover-radius: ${v.coverR};
+  --wfp-wave-h: ${v.waveH}px;           /* waveform height */
+  --wfp-bar-w: ${v.barW}px;             /* bar width */
+  --wfp-gap: ${v.gap}px;                /* space between bars */
+  --wfp-mirror: ${v.mirror};            /* reflection size, 0 = off */
+  display:block;container-type:inline-size;color:var(--wfp-text);font-family:inherit;line-height:1.3;margin:0 0 1.5em
+}
+.wfp-player *{box-sizing:border-box}
+.wfp-card{display:grid;grid-template-columns:var(--wfp-cover-size) minmax(0,1fr);grid-template-rows:auto 1fr;grid-template-areas:"cover head" "cover wave";gap:12px 16px;padding:12px;background:var(--wfp-bg);border-radius:var(--wfp-radius)}
+.wfp-card.wfp-nocover{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "wave"}
+.wfp-cover{grid-area:cover;display:block;width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--wfp-cover-radius);align-self:start;margin:0}
+.wfp-cover-ph{display:grid;place-items:center;background:color-mix(in srgb,var(--wfp-text) 10%,transparent)}
+.wfp-cover-ph svg{width:36%;height:36%;fill:var(--wfp-text);opacity:.45}
+.wfp-head{grid-area:head;display:flex;align-items:center;gap:12px;min-width:0}
+.wfp-btn{flex:none;width:52px;height:52px;margin:0;padding:0;border:0;border-radius:50%;background:var(--wfp-accent);color:var(--wfp-btn-icon);display:grid;place-items:center;cursor:pointer;transition:transform .15s}
+.wfp-btn:hover{transform:scale(1.05)}
+.wfp-btn:focus-visible,.wfp-share:focus-visible{outline:2px solid var(--wfp-accent);outline-offset:2px}
+.wfp-btn svg{width:26px;height:26px;fill:currentColor}
+.wfp-btn .wfp-i-play{margin-left:3px}
+.wfp-i-pause,.wfp-playing .wfp-i-play{display:none}
+.wfp-playing .wfp-i-pause{display:block}
+.wfp-title{flex:1;min-width:0;font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wfp-share{flex:none;display:inline-flex;align-items:center;gap:6px;margin:0;padding:5px 10px;font:inherit;font-size:13px;color:var(--wfp-text);background:transparent;border:1px solid color-mix(in srgb,var(--wfp-text) 30%,transparent);border-radius:4px;cursor:pointer}
+.wfp-share svg{width:14px;height:14px;fill:currentColor}
+.wfp-wave{grid-area:wave;align-self:end;position:relative;height:var(--wfp-wave-h);cursor:pointer;touch-action:pan-y;outline:none;user-select:none}
+.wfp-wave:focus-visible{box-shadow:0 0 0 2px var(--wfp-accent)}
+.wfp-base,.wfp-layer{position:absolute;top:0;left:0;height:100%;overflow:hidden}
+.wfp-base{width:100%}
+.wfp-layer{width:0;pointer-events:none}
+.wfp-hover{opacity:.35}
+.wfp-wave svg{display:block;max-width:none}
+.wfp-base rect{fill:var(--wfp-wave)}
+.wfp-layer rect{fill:var(--wfp-accent)}
+.wfp-wave rect.wfp-r{opacity:.45}
+.wfp-time{position:absolute;top:calc(var(--wfp-wave-h) * (1 - var(--wfp-mirror)) - 18px);padding:1px 4px;font-size:11px;line-height:16px;background:var(--wfp-text);color:var(--wfp-badge-ink);pointer-events:none;font-variant-numeric:tabular-nums}
+.wfp-cur{left:0;display:none;background:var(--wfp-accent);color:var(--wfp-btn-icon)}
+.wfp-tot{right:0}
+.wfp-started .wfp-cur{display:block}
+@container (max-width:520px){
+  .wfp-card{grid-template-columns:64px minmax(0,1fr);grid-template-rows:auto auto;grid-template-areas:"cover head" "wave wave"}
+  .wfp-card.wfp-nocover{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "wave"}
+  .wfp-btn{width:44px;height:44px}
+  .wfp-btn svg{width:22px;height:22px}
+  .wfp-title{font-size:16px}
+  .wfp-share-label{display:none}
+}
+@media (prefers-reduced-motion:reduce){.wfp-btn{transition:none}}
+`}
+
+const buildJS=()=>`/* Waveform Player script: paste once per page, after the players.
+   Works with any number of players. No libraries needed.
+   Safe for WordPress: contains no characters that WordPress re-encodes. */
+(${wfpRuntime.toString()})();
+`;
+
+async function copyText(t){
+  try{await navigator.clipboard.writeText(t);return true}
+  catch(e){const ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(x){}ta.remove();return ok}
+}
+
+/* ---------- UI components ---------- */
+function Seg({value,onChange,options,label}){
+  return h`<div className="seg" role="group" aria-label=${label}>${options.map(([v,l])=>h`<button type="button" key=${v} aria-pressed=${value===v} onClick=${()=>onChange(v)}>${l}</button>`)}</div>`;
+}
+function Range({id,label,value,min,max,step=1,unit='',onChange}){
+  return h`<div className="range"><label htmlFor=${id}>${label}</label><output htmlFor=${id}>${value}${unit}</output><input id=${id} type="range" min=${min} max=${max} step=${step} value=${value} onChange=${e=>onChange(+e.target.value)}/></div>`;
+}
+function ColorField({label,value,onChange}){
+  const [txt,setTxt]=useState(value);
+  useEffect(()=>setTxt(value),[value]);
+  return h`<div className="cf"><input type="color" value=${value} onChange=${e=>onChange(e.target.value)} aria-label=${label+' color picker'}/><div><small>${label}</small><input type="text" value=${txt} spellCheck=${false} aria-label=${label+' hex code'} onChange=${e=>{const v=e.target.value.trim();setTxt(e.target.value);if(isHex(v))onChange(normHex(v))}}/></div></div>`;
+}
+function Drop({accept,onFile,title,sub,id}){
+  const [on,setOn]=useState(false);
+  return h`<label className=${'drop'+(on?' on':'')} htmlFor=${id}
+    onDragOver=${e=>{e.preventDefault();setOn(true)}} onDragLeave=${()=>setOn(false)}
+    onDrop=${e=>{e.preventDefault();setOn(false);onFile(e.dataTransfer.files[0])}}>
+    <input id=${id} type="file" accept=${accept} onChange=${e=>{onFile(e.target.files[0]);e.target.value=''}}/>
+    <b>${title}</b><small>${sub}</small></label>`;
+}
+
+/* ---------- App ---------- */
+function App(){
+  const [file,setFile]=useState(null);
+  const [blob,setBlob]=useState('');
+  const [ana,setAna]=useState(null);
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState('');
+  const [info,setInfo]=useState('');
+  const [playMsg,setPlayMsg]=useState('');
+  const [title,setTitle]=useState('Forged Again');
+  const titleTouched=useRef(false);
+  const [audioUrl,setAudioUrl]=useState('');
+  const [coverMode,setCoverMode]=useState('placeholder');
+  const [coverFile,setCoverFile]=useState(null);
+  const [coverBlob,setCoverBlob]=useState('');
+  const [coverUrl,setCoverUrl]=useState('');
+  const [shape,setShape]=useState('square');
+  const [col,setCol]=useState(PRESETS[0]);
+  const [transparent,setTransparent]=useState(false);
+  const [mirror,setMirror]=useState(true);
+  const [share,setShare]=useState(false);
+  const [waveH,setWaveH]=useState(72);
+  const [barW,setBarW]=useState(3);
+  const [gap,setGap]=useState(1);
+  const [radius,setRadius]=useState(6);
+  const [stage,setStage]=useState('light');
+  const [tab,setTab]=useState('html');
+  const [copied,setCopied]=useState('');
+  const stageRef=useRef(null);
+
+  async function onAudio(f){
+    if(!f)return;
+    if(!/^audio\//.test(f.type)&&!/\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(f.name)){setErr('That file does not look like audio. Choose an MP3.');return}
+    setErr('');setInfo('');setBusy(true);
+    const url=URL.createObjectURL(f);
+    try{
+      let r;
+      try{r=await analyze(f)}
+      catch(e){
+        const d=await mediaDuration(url);
+        if(!d)throw e;
+        r={peaks:SAMPLE,duration:d,fallback:true};
+        setInfo('This browser could not read the waveform from the file ('+((e&&(e.message||e.name))||'decode error')+'). A sample shape is used; try Chrome or Firefox for the real waveform.');
+      }
+      setAna(r);setFile(f);
+      setBlob(old=>{if(old)URL.revokeObjectURL(old);return url});
+      if(!titleTouched.current)setTitle(niceName(f.name));
+    }catch(e){URL.revokeObjectURL(url);setErr('This file could not be read ('+((e&&(e.message||e.name))||'unknown error')+'). Try another MP3.')}
+    finally{setBusy(false)}
+  }
+  function onCover(f){
+    if(!f)return;
+    if(!/^image\//.test(f.type)){setErr('The cover must be an image (JPG, PNG or WebP).');return}
+    setErr('');setCoverFile(f);
+    setCoverBlob(old=>{if(old)URL.revokeObjectURL(old);return URL.createObjectURL(f)});
+  }
+  const setC=k=>v=>setCol(c=>({...c,[k]:v,name:''}));
+
+  const audioName=file?file.name:'your-song.mp3';
+  const coverName=coverFile?coverFile.name:'cover.jpg';
+  const aUrl=audioUrl.trim(),cUrl=coverUrl.trim();
+  const peaks=ana?ana.peaks:SAMPLE,duration=ana?ana.duration:239;
+
+  const css=useMemo(()=>buildCSS({
+    bg:transparent?'transparent':col.bg,text:col.text,wave:col.wave,accent:col.accent,
+    icon:onColor(col.accent),badgeInk:onColor(col.text),radius,
+    coverR:shape==='circle'?'50%':shape==='rounded'?'10px':'0px',
+    waveH,barW,gap,mirror:mirror?0.3:0
+  }),[col,transparent,radius,shape,waveH,barW,gap,mirror]);
+
+  const previewHTML=useMemo(()=>{
+    const cs=coverBlob||cUrl;
+    return buildHTML({title,peaks,duration,share,preview:true,
+      audioSrc:blob,coverMode:coverMode==='image'&&!cs?'placeholder':coverMode,coverSrc:cs});
+  },[title,peaks,duration,share,blob,coverMode,coverBlob,cUrl]);
+
+  const outHTML=useMemo(()=>ana?buildHTML({title,peaks,duration,share,
+    audioSrc:aUrl||audioName,audioNote:!aUrl,coverMode,coverSrc:cUrl||coverName,coverNote:!cUrl}):'',
+    [ana,title,peaks,duration,share,aUrl,audioName,coverMode,cUrl,coverName]);
+  const js=useMemo(buildJS,[]);
+
+  useEffect(()=>{
+    const box=stageRef.current;
+    wfpRuntime();
+    setPlayMsg('');
+    const a=box&&box.querySelector('audio'),btn=box&&box.querySelector('.wfp-btn');
+    const onErr=()=>setPlayMsg('The browser could not play this file'+(a.error?' (error '+a.error.code+')':'')+'.');
+    const onBtn=()=>{
+      if(!blob){setPlayMsg('The sample has no sound. Upload an MP3 to hear the player.');return}
+      setTimeout(()=>{if(a.paused&&!a.ended&&a.currentTime===0&&!a.error)a.play().catch(e=>setPlayMsg('Playback was blocked here ('+(e.name||'error')+'). The player works on your site; in this viewer, try clicking play again.'))},400);
+    };
+    if(a)a.addEventListener('error',onErr);
+    if(btn)btn.addEventListener('click',onBtn);
+    return ()=>{if(a){a.pause();a.removeEventListener('error',onErr)}if(btn)btn.removeEventListener('click',onBtn)};
+  },[previewHTML]);
+  useEffect(()=>{
+    const el=stageRef.current&&stageRef.current.querySelector('.wfp-player');
+    if(el&&el._wfpDraw)el._wfpDraw();
+  },[css]);
+
+  const warns=[];
+  if(!transparent&&contrast(col.text,col.bg)<3)warns.push('The title text is hard to read on this background.');
+  if(!transparent&&contrast(col.wave,col.bg)<1.4)warns.push('The waveform barely stands out from the background.');
+  if(contrast(col.accent,col.wave)<1.25)warns.push('The played part looks almost the same as the unplayed bars.');
+
+  const code=tab==='html'?outHTML:tab==='css'?css:js;
+  const fileFor={html:'player.html',css:'player.css',js:'player.js'};
+  const hint={html:'one Custom HTML block per song',css:'paste once per site',js:'paste once per page'};
+
+  async function doCopy(){
+    if(await copyText(code)){setCopied(tab);setTimeout(()=>setCopied(''),1600)}
+  }
+  async function doZip(){
+    const zip=new JSZip();
+    zip.file('player.html',outHTML);zip.file('player.css',css);zip.file('player.js',js);
+    zip.file('demo.html',`<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${esc(title)}</title>\n<link rel="stylesheet" href="player.css">\n</head>\n<body style="font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 16px">\n\n${outHTML}\n\n<script src="player.js"><\/script>\n</body>\n</html>\n`);
+    if(!aUrl&&file)zip.file(file.name,file);
+    if(coverMode==='image'&&!cUrl&&coverFile)zip.file(coverFile.name,coverFile);
+    const b=await zip.generateAsync({type:'blob'}),name=slug(title)+'-player.zip';
+    let dl=null;
+    try{if(window.claude&&window.claude.use)dl=await window.claude.use('downloads')}catch(e){}
+    if(dl){try{await dl.save({filename:name,data:b})}catch(e){if(e&&e.code!=='declined')setErr('The download is not available here. Use the Copy buttons instead.')}return}
+    const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  }
+
+  return h`
+<style>${css}</style>
+<header className="top">
+  <h1>Waveform Player Maker</h1>
+  <p>Upload an MP3, style the player, then copy separate HTML, CSS and JavaScript for WordPress or any plain website.</p>
+</header>
+<main className="wrap">
+  <section className="prev panel" aria-label="Preview">
+    <div className="stagebar"><h2>Preview</h2><${Seg} label="Preview page background" value=${stage} onChange=${setStage} options=${[['light','Light page'],['dark','Dark page']]}/></div>
+    <div className=${'stage '+stage} ref=${stageRef} dangerouslySetInnerHTML=${{__html:previewHTML}}/>
+    <p className="note">${ana?`${file.name} · ${fmt(ana.duration)} · the preview plays the file from your computer`:'Sample waveform. Upload an MP3 to see and hear your own track.'}</p>
+    ${info&&h`<div className="warn">${info}</div>`}
+    ${playMsg&&h`<div className="warn" role="status">${playMsg}</div>`}
+  </section>
+
+  <aside className="ctl">
+    <div className="panel">
+      <h2>1. Audio <span>required</span></h2>
+      <${Drop} id="aud" accept="audio/*,.mp3" onFile=${onAudio}
+        title=${busy?'Reading the waveform…':file?'Replace MP3':'Choose or drop an MP3'}
+        sub=${file?file.name:'The file stays on your computer'}/>
+      ${err&&h`<div className="err" role="alert">${err}</div>`}
+      <label className="f" htmlFor="ttl">Song title</label>
+      <input id="ttl" type="text" value=${title} onChange=${e=>{titleTouched.current=true;setTitle(e.target.value)}}/>
+      <label className="f" htmlFor="aurl">Audio URL (optional)</label>
+      <input id="aurl" type="url" inputMode="url" placeholder="https://res.cloudinary.com/…/song.mp3" value=${audioUrl} onChange=${e=>setAudioUrl(e.target.value)}/>
+      <p className="meta">${aUrl?'The player will stream from this URL.':`Without a URL the code uses "${audioName}". Replace it after uploading the file to your site.`}</p>
+    </div>
+
+    <div className="panel">
+      <h2>2. Cover image <span>optional</span></h2>
+      <${Seg} label="Cover image" value=${coverMode} onChange=${setCoverMode} options=${[['none','None'],['placeholder','Placeholder'],['image','Image']]}/>
+      ${coverMode==='image'&&h`<div style=${{marginTop:12}}>
+        <${Drop} id="cov" accept="image/*" onFile=${onCover} title=${coverFile?'Replace image':'Choose or drop an image'} sub=${coverFile?coverFile.name:'Used for the preview'}/>
+        <label className="f" htmlFor="curl">Image URL (optional)</label>
+        <input id="curl" type="url" inputMode="url" placeholder="https://…/cover.jpg" value=${coverUrl} onChange=${e=>setCoverUrl(e.target.value)}/>
+        <p className="meta">${cUrl?'The player will load the cover from this URL.':`Without a URL the code uses "${coverName}".`}</p>
+      </div>`}
+      ${coverMode!=='none'&&h`<div><span className="f">Shape</span><${Seg} label="Cover shape" value=${shape} onChange=${setShape} options=${[['square','Square'],['rounded','Rounded'],['circle','Circle']]}/></div>`}
+    </div>
+
+    <div className="panel">
+      <h2>3. Colors</h2>
+      <div className="presets">${PRESETS.map(p=>h`<button type="button" className="chip" key=${p.name} aria-pressed=${col.name===p.name} onClick=${()=>setCol(p)}><span>${[p.bg,p.text,p.wave,p.accent].map((c,i)=>h`<i key=${i} style=${{background:c}}/>`)}</span>${p.name}</button>`)}</div>
+      <div className="colors">
+        <${ColorField} label="Background" value=${col.bg} onChange=${setC('bg')}/>
+        <${ColorField} label="Text" value=${col.text} onChange=${setC('text')}/>
+        <${ColorField} label="Wave" value=${col.wave} onChange=${setC('wave')}/>
+        <${ColorField} label="Accent" value=${col.accent} onChange=${setC('accent')}/>
+      </div>
+      <label className="check"><input type="checkbox" checked=${transparent} onChange=${e=>setTransparent(e.target.checked)}/>Transparent background (uses the site's color)</label>
+      <p className="meta">Accent colors the play button and the part already played.</p>
+      ${warns.map(w=>h`<div className="warn" key=${w}>${w}</div>`)}
+    </div>
+
+    <div className="panel">
+      <h2>4. Player</h2>
+      <label className="check"><input type="checkbox" checked=${mirror} onChange=${e=>setMirror(e.target.checked)}/>Mirrored waveform (reflection below)</label>
+      <label className="check"><input type="checkbox" checked=${share} onChange=${e=>setShare(e.target.checked)}/>Share button</label>
+      <${Range} id="wh" label="Waveform height" value=${waveH} min=${40} max=${140} unit="px" onChange=${setWaveH}/>
+      <${Range} id="bw" label="Bar width" value=${barW} min=${1} max=${8} unit="px" onChange=${setBarW}/>
+      <${Range} id="gp" label="Space between bars" value=${gap} min=${0} max=${4} unit="px" onChange=${setGap}/>
+      <${Range} id="rd" label="Card corners" value=${radius} min=${0} max=${24} unit="px" onChange=${setRadius}/>
+    </div>
+  </aside>
+
+  <section className="out panel" aria-label="Generated code">
+    <div className="tabs" role="tablist">${['html','css','js'].map(k=>h`<button key=${k} role="tab" aria-selected=${tab===k} onClick=${()=>setTab(k)}>${k==='js'?'JavaScript':k.toUpperCase()}</button>`)}</div>
+    ${ana?h`<div>
+      <div className="codebar"><span>${fileFor[tab]} · ${hint[tab]}</span><button className="btn" type="button" onClick=${doCopy}>${copied===tab?'Copied':'Copy '+(tab==='js'?'JavaScript':tab.toUpperCase())}</button></div>
+      <pre tabIndex="0"><code>${code}</code></pre>
+      <div className="actions"><button className="btn pri" type="button" onClick=${doZip}>Download ZIP</button><span className="meta">player.html, player.css, player.js, a demo page${!aUrl?' and your MP3':''}</span></div>
+    </div>`:h`<div className="locked">Upload an MP3 to generate the code. The waveform is calculated from the file itself.</div>`}
+    <details className="how" open>
+      <summary>Where to paste it</summary>
+      <ol>
+        <li><b>HTML</b>: in WordPress, add a <b>Custom HTML</b> block where the player should appear. One block per song.</li>
+        <li><b>CSS</b>: once per site. Classic themes: <b>Appearance → Customize → Additional CSS</b>. Block themes: <b>Site Editor → Styles → Additional CSS</b>.</li>
+        <li><b>JavaScript</b>: once per page, below the players. Use a code-snippets plugin set to the footer, or a Custom HTML block with the code inside <code>${'<script> … <\/script>'}</code>. WordPress only keeps scripts added by administrators.</li>
+        <li><b>Other websites</b>: save <code>player.css</code> and <code>player.js</code>, add <code>${'<link rel="stylesheet" href="player.css">'}</code> in the head and <code>${'<script src="player.js"><\/script>'}</code> before <code>${'</body>'}</code>.</li>
+        <li><b>Several songs on one page</b>: repeat only the HTML. The CSS and JavaScript handle every player.</li>
+      </ol>
+    </details>
+  </section>
+</main>`;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h`<${App}/>`);
+}
+</script>
+</body>
+</html>
